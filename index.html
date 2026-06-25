@@ -49,6 +49,28 @@
         .clock-date { font-size: 0.7rem; opacity: 0.9; }
         .clock-time { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
         .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f0f4f9;
+            padding: 4px 16px;
+            border-radius: 40px;
+            border: 1px solid #cbdde6;
+            transition: all 0.3s;
+        }
+        .sync-status.syncing {
+            border-color: #f39c12;
+            background: #fef9e7;
+        }
+        .sync-status.synced {
+            border-color: #2ecc71;
+            background: #eafaf1;
+        }
+        .sync-status.error {
+            border-color: #e74c3c;
+            background: #fdedec;
+        }
         .btn-icon {
             background: #f0f4f9;
             border: none;
@@ -198,12 +220,20 @@
 <body>
 <div class="db-container">
     <div class="db-header">
-        <div class="header-row">
+        <div class="header-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div class="title-section">
                 <h1><i class="fas fa-database"></i> NTWC DR Equipment Logging Database</h1>
                 <p>CPH | POH | TMH | TSWH | YOP · Intelligent Asset Tracker</p>
             </div>
-            <div class="clock-area"><div class="clock-date" id="hkDate">Loading...</div><div class="clock-time" id="hkTime">--:--:--</div></div>
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <div class="clock-area"><div class="clock-date" id="hkDate">Loading...</div><div class="clock-time" id="hkTime">--:--:--</div></div>
+                <div id="syncStatusContainer" class="sync-status">
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #4a627a;">SYNC</span>
+                    <span id="syncStatusIndicator" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #cbdde6;"></span>
+                    <span id="syncStatusText" style="font-size: 0.75rem; color: #4a627a; font-weight: 500;">Idle</span>
+                    <span id="syncLastUpdate" style="font-size: 0.65rem; color: #7a9aaa;"></span>
+                </div>
+            </div>
         </div>
         <div class="header-row" style="margin-top: 12px;">
             <div class="action-buttons">
@@ -213,9 +243,8 @@
                 <button id="restoreBtn" class="btn-icon"><i class="fas fa-upload"></i> Restore</button>
                 <button id="syncBtn" class="btn-icon btn-success"><i class="fas fa-cloud-upload-alt"></i> Sync to Cloud</button>
                 <button id="loadCloudBtn" class="btn-icon btn-primary"><i class="fas fa-cloud-download-alt"></i> Load from Cloud</button>
+                <button id="refreshDBBtn" class="btn-icon btn-warning"><i class="fas fa-sync-alt"></i> Refresh DB</button>
                 <div class="export-dropdown"><button id="exportBtn" class="btn-icon btn-success"><i class="fas fa-file-export"></i> Export ▼</button><div id="exportMenu" class="export-menu"><button id="exportCSV">CSV</button><button id="exportExcel">Excel (XLSX)</button><button id="exportPDF">PDF</button><button id="exportJPEG">JPEG Screenshot</button></div></div>
-                <button id="saveAllBtn" class="btn-icon"><i class="fas fa-save"></i> Save</button>
-                <button id="refreshBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Refresh</button>
                 <button id="addEquipBtn" class="btn-icon btn-primary"><i class="fas fa-plus-circle"></i> New Equipment</button>
             </div>
         </div>
@@ -246,8 +275,47 @@
 <div id="logModal" class="modal"><div class="modal-content"><div class="flex-between"><h3 id="modalEquipTitle"><i class="fas fa-history"></i> Maintenance Logs</h3><button id="closeModalBtn" style="background:none;font-size:28px;">&times;</button></div><div style="overflow-x: auto;"><table class="log-table"><thead><tr><th>Date</th><th>ET/SET</th><th>Maintenance Jobs</th><th>Remark</th><th>Job Ref</th><th>Start</th><th>Finish</th><th>Other</th><th>Actions</th></tr></thead><tbody id="logTableBody"></tbody></table></div><div class="flex-between" style="margin-top:20px;"><button id="addRecordFromModal" class="btn-icon btn-primary">➕ Add Record</button><button id="closeModalFooter" class="btn-icon">Close</button></div></div></div>
 
 <!-- Audit Log Modal -->
-<div id="auditModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-history"></i> System Audit Log</h3><button id="closeAuditBtn" style="background:none;font-size:28px;">&times;</button></div><div style="overflow-x: auto; max-height: 70vh;"><table class="audit-table"><thead><tr><th>Timestamp (HK)</th><th>Action Type</th><th>User</th><th>Equipment</th><th>Details</th></tr></thead><tbody id="auditTableBody"></tbody></table></div><div class="flex-between" style="margin-top:20px;"><button id="clearAuditBtn" class="btn-icon btn-warning">Clear All Logs</button><button id="closeAuditFooterBtn" class="btn-icon">Close</button></div></div></div>
-
+<div id="auditModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-history"></i> System Audit Log</h3><button id="closeAuditBtn" style="background:none;font-size:28px;">&times;</button></div>
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; padding: 12px 16px; background: #f8fafc; border-radius: 16px;">
+        <div style="flex: 1; min-width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #1b7f8c; display: block;">Action Type</label>
+            <select id="auditActionFilter" style="width:100%; padding: 8px 12px; border-radius: 20px; border: 1px solid #cbdde6; background: white; font-size: 0.85rem;">
+                <option value="">All Actions</option>
+                <option value="ADD">ADD</option>
+                <option value="EDIT">EDIT</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+                <option value="REMOVE">REMOVE</option>
+                <option value="BACKUP">BACKUP</option>
+                <option value="RESTORE">RESTORE</option>
+                <option value="EXPORT">EXPORT</option>
+                <option value="SYNC">SYNC</option>
+                <option value="CLOUD">CLOUD</option>
+                <option value="SAVE">SAVE</option>
+                <option value="REFRESH">REFRESH</option>
+                <option value="SYSTEM_INIT">SYSTEM_INIT</option>
+                <option value="PAGE_LOAD">PAGE_LOAD</option>
+                <option value="SELECT_ALL">SELECT_ALL</option>
+                <option value="CLEAR_AUDIT">CLEAR_AUDIT</option>
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #1b7f8c; display: block;">From Date</label>
+            <input type="date" id="auditDateFrom" style="width:100%; padding: 8px 12px; border-radius: 20px; border: 1px solid #cbdde6; background: white; font-size: 0.85rem;">
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+            <label style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #1b7f8c; display: block;">To Date</label>
+            <input type="date" id="auditDateTo" style="width:100%; padding: 8px 12px; border-radius: 20px; border: 1px solid #cbdde6; background: white; font-size: 0.85rem;">
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 8px;">
+            <button id="auditApplyFilters" class="btn-icon btn-primary" style="padding: 8px 16px;"><i class="fas fa-filter"></i> Apply</button>
+            <button id="auditClearFilters" class="btn-icon" style="padding: 8px 16px;"><i class="fas fa-times"></i> Clear</button>
+        </div>
+    </div>
+    <div style="overflow-x: auto; max-height: 55vh;"><table class="audit-table"><thead><tr><th>Timestamp (HK)</th><th>Action Type</th><th>User</th><th>Equipment</th><th>Details</th></tr></thead><tbody id="auditTableBody"></tbody></table></div>
+    <div class="flex-between" style="margin-top:20px;"><button id="clearAuditBtn" class="btn-icon btn-warning">Clear All Logs</button><button id="closeAuditFooterBtn" class="btn-icon">Close</button></div>
+</div></div>
+    
 <!-- Compare Modal -->
 <div id="compareModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-code-branch"></i> Equipment Comparison</h3><button id="closeCompareBtn" style="background:none;font-size:28px;">&times;</button></div><div id="compareContent" style="display:flex; gap:20px; flex-wrap:wrap;"></div></div></div>
 
@@ -460,7 +528,7 @@
         }
     }
 
-    // Save equipment to Supabase
+   // Save equipment to Supabase with preserved log IDs
     async function saveEquipmentToSupabase(equipment) {
         if (!isSupabaseAvailable()) {
             console.warn('Supabase not available, skipping save');
@@ -516,31 +584,82 @@
                 equipmentId = data[0].id;
             }
             
-            // Delete existing logs for this equipment
-            await supabaseClient
+            // Get existing logs from Supabase for this equipment
+            const { data: existingLogs, error: fetchError } = await supabaseClient
                 .from('logs')
-                .delete()
+                .select('id, date, et, jobs, remark, ref, start_time, finish_time, other_et')
                 .eq('equipment_id', equipmentId);
             
-            // Insert new logs
-            if (equipment.logs && equipment.logs.length > 0) {
-                const logsToInsert = equipment.logs.map(log => ({
-                    equipment_id: equipmentId,
-                    date: log.date || '',
-                    et: log.et || '',
-                    jobs: log.jobs || '',
-                    remark: log.remark || '',
-                    ref: log.ref || '',
-                    start_time: log.start || '',
-                    finish_time: log.finish || '',
-                    other_et: log.other || ''
-                }));
+            if (fetchError) throw fetchError;
+            
+            // Create a map of existing logs by a unique key (date + job description)
+            const existingLogMap = new Map();
+            existingLogs.forEach(log => {
+                const key = `${log.date}|${log.jobs?.substring(0, 50) || ''}`;
+                existingLogMap.set(key, log);
+            });
+            
+            // Process each log from the local equipment
+            for (const log of equipment.logs || []) {
+                const key = `${log.date}|${log.jobs?.substring(0, 50) || ''}`;
+                const existingLog = existingLogMap.get(key);
                 
-                const { error: logError } = await supabaseClient
+                if (existingLog) {
+                    // Update existing log if there are changes
+                    if (existingLog.et !== (log.et || '') ||
+                        existingLog.jobs !== (log.jobs || '') ||
+                        existingLog.remark !== (log.remark || '') ||
+                        existingLog.ref !== (log.ref || '') ||
+                        existingLog.start_time !== (log.start || '') ||
+                        existingLog.finish_time !== (log.finish || '') ||
+                        existingLog.other_et !== (log.other || '')) {
+                        
+                        const { error: updateError } = await supabaseClient
+                            .from('logs')
+                            .update({
+                                et: log.et || '',
+                                jobs: log.jobs || '',
+                                remark: log.remark || '',
+                                ref: log.ref || '',
+                                start_time: log.start || '',
+                                finish_time: log.finish || '',
+                                other_et: log.other || '',
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', existingLog.id);
+                        
+                        if (updateError) throw updateError;
+                    }
+                    // Remove from map to track which logs were processed
+                    existingLogMap.delete(key);
+                } else {
+                    // Insert new log
+                    const { error: insertError } = await supabaseClient
+                        .from('logs')
+                        .insert({
+                            equipment_id: equipmentId,
+                            date: log.date || '',
+                            et: log.et || '',
+                            jobs: log.jobs || '',
+                            remark: log.remark || '',
+                            ref: log.ref || '',
+                            start_time: log.start || '',
+                            finish_time: log.finish || '',
+                            other_et: log.other || ''
+                        });
+                    
+                    if (insertError) throw insertError;
+                }
+            }
+            
+            // Delete any logs that exist in cloud but not locally (stale logs)
+            for (const [key, log] of existingLogMap) {
+                const { error: deleteError } = await supabaseClient
                     .from('logs')
-                    .insert(logsToInsert);
+                    .delete()
+                    .eq('id', log.id);
                 
-                if (logError) throw logError;
+                if (deleteError) throw deleteError;
             }
             
             return equipmentId;
@@ -550,6 +669,184 @@
         }
     }
 
+    // ==================== SYNC STATUS MANAGEMENT ====================
+    let syncStatusTimeout = null;
+    
+    function updateSyncStatus(status, message, isError = false) {
+        const indicator = document.getElementById('syncStatusIndicator');
+        const text = document.getElementById('syncStatusText');
+        const container = document.getElementById('syncStatusContainer');
+        const lastUpdate = document.getElementById('syncLastUpdate');
+        const now = new Date().toLocaleTimeString('en-HK', {hour12: false});
+        
+        // Reset classes
+        container.className = 'sync-status';
+        
+        switch(status) {
+            case 'idle':
+                indicator.style.background = '#cbdde6';
+                text.textContent = 'Idle';
+                break;
+            case 'syncing':
+                container.classList.add('syncing');
+                indicator.style.background = '#f39c12';
+                indicator.style.animation = 'pulse 1s infinite';
+                text.textContent = message || 'Syncing...';
+                break;
+            case 'synced':
+                container.classList.add('synced');
+                indicator.style.background = '#2ecc71';
+                indicator.style.animation = 'none';
+                text.textContent = message || 'Synced';
+                lastUpdate.textContent = `Last: ${now}`;
+                break;
+            case 'error':
+                container.classList.add('error');
+                indicator.style.background = '#e74c3c';
+                indicator.style.animation = 'none';
+                text.textContent = message || 'Error';
+                break;
+            case 'loading':
+                container.classList.add('syncing');
+                indicator.style.background = '#3498db';
+                indicator.style.animation = 'pulse 1s infinite';
+                text.textContent = message || 'Loading...';
+                break;
+        }
+    }
+    
+    // Add pulse animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Update the sync functions to use the status
+    // Modify loadFromSupabase function
+    async function loadFromSupabase() {
+        if (!isSupabaseAvailable()) {
+            updateSyncStatus('error', 'Supabase unavailable');
+            toastMsg('Supabase not available. Using local data.');
+            return false;
+        }
+        
+        try {
+            updateSyncStatus('loading', 'Loading from cloud...');
+            toastMsg('Loading from cloud...');
+            
+            // Load equipment
+            const { data: equipmentData, error: eqError } = await supabaseClient
+                .from('equipment')
+                .select('*')
+                .order('id');
+            
+            if (eqError) throw eqError;
+            
+            // Load logs for each equipment
+            const { data: logsData, error: logError } = await supabaseClient
+                .from('logs')
+                .select('*')
+                .order('id');
+            
+            if (logError) throw logError;
+            
+            // Load audit logs
+            const { data: auditData, error: auditError } = await supabaseClient
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(500);
+            
+            if (auditError) throw auditError;
+            
+            // Reconstruct equipment with logs
+            equipmentDB = equipmentData.map(eq => ({
+                hosp: eq.hosp,
+                loc: eq.loc,
+                manuf: eq.manuf,
+                model: eq.model,
+                serial: eq.serial,
+                eam: eq.eam,
+                maintenanceUnit: eq.maintenance_unit,
+                logs: logsData.filter(log => log.equipment_id === eq.id).map(log => ({
+                    date: log.date,
+                    et: log.et,
+                    jobs: log.jobs,
+                    remark: log.remark,
+                    ref: log.ref,
+                    start: log.start_time,
+                    finish: log.finish_time,
+                    other: log.other_et
+                }))
+            }));
+            
+            // Reconstruct audit logs
+            auditLogs = auditData.map(log => ({
+                timestamp: log.timestamp,
+                action: log.action,
+                user: log.user_name,
+                equipment: log.equipment,
+                details: log.details
+            }));
+            
+            // Update local storage as backup
+            localStorage.setItem('NTWC_MPU_DB', JSON.stringify(equipmentDB));
+            localStorage.setItem('NTWC_MPU_AUDIT', JSON.stringify(auditLogs));
+            
+            renderEquipmentGrid();
+            populateFilterDropdowns();
+            updateSyncStatus('synced', 'Cloud loaded');
+            toastMsg('Data loaded from cloud successfully');
+            return true;
+        } catch (error) {
+            console.error('Error loading from Supabase:', error);
+            updateSyncStatus('error', 'Load failed');
+            toastMsg('Failed to load from cloud: ' + error.message);
+            return false;
+        }
+    }
+    
+    // Modify syncToSupabase function
+    async function syncToSupabase() {
+        if (!isSupabaseAvailable()) {
+            updateSyncStatus('error', 'Supabase unavailable');
+            toastMsg('Supabase not available. Please check your connection.');
+            return false;
+        }
+        
+        try {
+            updateSyncStatus('syncing', 'Syncing to cloud...');
+            toastMsg('Syncing to cloud...');
+            let syncCount = 0;
+            
+            // Sync all equipment
+            for (const eq of equipmentDB) {
+                await saveEquipmentToSupabase(eq);
+                syncCount++;
+            }
+            
+            // Sync audit logs (only last 100 to avoid rate limits)
+            const recentAuditLogs = auditLogs.slice(0, 100);
+            for (const log of recentAuditLogs) {
+                await saveAuditLogToSupabase(log);
+            }
+            
+            updateSyncStatus('synced', `${syncCount} items synced`);
+            toastMsg('Sync completed! ' + syncCount + ' equipment synced.');
+            return true;
+        } catch (error) {
+            console.error('Sync error:', error);
+            updateSyncStatus('error', 'Sync failed');
+            toastMsg('Sync failed: ' + error.message);
+            return false;
+        }
+    }
+    
     // Save audit log to Supabase
     async function saveAuditLogToSupabase(auditLog) {
         if (!isSupabaseAvailable()) {
@@ -643,10 +940,50 @@
     }
 
     function showAuditLogModal() {
+        // Reset filters
+        document.getElementById("auditActionFilter").value = "";
+        document.getElementById("auditDateFrom").value = "";
+        document.getElementById("auditDateTo").value = "";
+        renderAuditLogs();
+        document.getElementById("auditModal").style.display = "flex";
+    }
+    
+    function renderAuditLogs() {
+        const actionFilter = document.getElementById("auditActionFilter").value;
+        const dateFrom = document.getElementById("auditDateFrom").value;
+        const dateTo = document.getElementById("auditDateTo").value;
+        
+        let filteredLogs = auditLogs;
+        
+        // Filter by action
+        if (actionFilter) {
+            filteredLogs = filteredLogs.filter(log => 
+                log.action && log.action.includes(actionFilter)
+            );
+        }
+        
+        // Filter by date range
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            filteredLogs = filteredLogs.filter(log => {
+                const logDate = new Date(log.timestamp);
+                return logDate >= fromDate;
+            });
+        }
+        
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59);
+            filteredLogs = filteredLogs.filter(log => {
+                const logDate = new Date(log.timestamp);
+                return logDate <= toDate;
+            });
+        }
+        
         const tbody = document.getElementById("auditTableBody");
-        if(auditLogs.length === 0) tbody.innerHTML = "<tr><td colspan='5'>No audit records found</td></tr>";
+        if(filteredLogs.length === 0) tbody.innerHTML = "<tr><td colspan='5'>No audit records found matching filters</td></tr>";
         else {
-            tbody.innerHTML = auditLogs.map(log => `<tr>
+            tbody.innerHTML = filteredLogs.map(log => `<tr>
                 <td>${log.timestamp}</td>
                 <td><span style="background:${getActionColor(log.action)}; padding:2px 8px; border-radius:20px; font-size:0.7rem;">${log.action}</span></td>
                 <td>${log.user}</td>
@@ -654,8 +991,16 @@
                 <td style="max-width:300px;">${log.details}</td>
             </tr>`).join('');
         }
-        document.getElementById("auditModal").style.display = "flex";
     }
+    
+    // Add event listeners for audit filters
+    document.getElementById("auditApplyFilters").onclick = () => renderAuditLogs();
+    document.getElementById("auditClearFilters").onclick = () => {
+        document.getElementById("auditActionFilter").value = "";
+        document.getElementById("auditDateFrom").value = "";
+        document.getElementById("auditDateTo").value = "";
+        renderAuditLogs();
+    };
     
     function getActionColor(action) {
         if(action.includes("ADD")) return "#c8e6c9";
@@ -1141,7 +1486,7 @@
             toastMsg("Supabase is not available. Please check your internet connection and Supabase configuration.");
         }
     };
-
+    
     document.getElementById("loadCloudBtn").onclick = async () => {
         if (isSupabaseAvailable()) {
             if (confirm("Load data from cloud? This will overwrite your local data with cloud data.")) {
@@ -1158,15 +1503,38 @@
         }
     };
 
+    // Refresh DB button - reload from cloud and update local
+    document.getElementById("refreshDBBtn").onclick = async () => {
+        if (isSupabaseAvailable()) {
+            if (confirm("Refresh database from cloud? This will:\n1. Load latest data from cloud\n2. Update your local view\n3. Resolve any conflicts")) {
+                updateSyncStatus('loading', 'Refreshing from cloud...');
+                const success = await loadFromSupabase();
+                if (success) {
+                    renderEquipmentGrid();
+                    populateFilterDropdowns();
+                    updateSyncStatus('synced', 'Database refreshed');
+                    toastMsg('Database refreshed from cloud successfully');
+                    addAuditLog("REFRESH_DATABASE", "N/A", "Manual database refresh from cloud performed");
+                }
+            }
+        } else {
+            // Fallback to local refresh
+            loadFromLocal();
+            populateFilterDropdowns();
+            toastMsg('Database refreshed from local storage');
+            addAuditLog("REFRESH_DATABASE_LOCAL", "N/A", "Manual database refresh from local storage performed");
+        }
+    };
+
     // ==================== OTHER BUTTON HANDLERS ====================
     document.getElementById("guideBtn").onclick = () => document.getElementById("guideModal").style.display="flex";
-    document.getElementById("saveAllBtn").onclick = () => saveToLocal();
+    //document.getElementById("saveAllBtn").onclick = () => saveToLocal();
     
-    document.getElementById("refreshBtn").onclick = () => { 
-        loadFromLocal(); 
-        selectedEquipIndices.clear(); 
-        populateFilterDropdowns();
-    };
+    //document.getElementById("refreshBtn").onclick = () => { 
+        //loadFromLocal(); 
+        //selectedEquipIndices.clear(); 
+        //populateFilterDropdowns();
+    //};
     
     document.getElementById("addEquipBtn").onclick = () => { 
         document.getElementById("formMode").value="equipment"; 
