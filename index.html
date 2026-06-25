@@ -49,28 +49,185 @@
         .clock-date { font-size: 0.7rem; opacity: 0.9; }
         .clock-time { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
         .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+        
+        /* Enhanced Sync Status Styles */
         .sync-status {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             background: #f0f4f9;
-            padding: 4px 16px;
+            padding: 6px 20px;
             border-radius: 40px;
             border: 1px solid #cbdde6;
-            transition: all 0.3s;
+            transition: all 0.4s ease;
+            min-width: 200px;
         }
+        
+        .sync-status.idle {
+            border-color: #cbdde6;
+            background: #f0f4f9;
+        }
+        
         .sync-status.syncing {
             border-color: #f39c12;
             background: #fef9e7;
+            box-shadow: 0 0 20px rgba(243, 156, 18, 0.2);
+            animation: glowPulse 1.2s ease-in-out infinite;
         }
+        
         .sync-status.synced {
             border-color: #2ecc71;
             background: #eafaf1;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
         }
+        
+        .sync-status.loading {
+            border-color: #3498db;
+            background: #ebf5fb;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.2);
+            animation: glowPulse 1.2s ease-in-out infinite;
+        }
+        
         .sync-status.error {
             border-color: #e74c3c;
             background: #fdedec;
+            box-shadow: 0 0 20px rgba(231, 76, 60, 0.2);
+            animation: shake 0.5s ease-in-out;
         }
+        
+        /* Sync Status Indicator Dot */
+        .sync-indicator {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            transition: all 0.4s ease;
+            flex-shrink: 0;
+        }
+        
+        .sync-indicator.idle {
+            background: #cbdde6;
+        }
+        
+        .sync-indicator.syncing {
+            background: #f39c12;
+            animation: pulseDot 0.8s ease-in-out infinite;
+        }
+        
+        .sync-indicator.synced {
+            background: #2ecc71;
+            animation: none;
+        }
+        
+        .sync-indicator.loading {
+            background: #3498db;
+            animation: pulseDot 0.8s ease-in-out infinite;
+        }
+        
+        .sync-indicator.error {
+            background: #e74c3c;
+            animation: none;
+        }
+        
+        /* Sync Status Text */
+        .sync-text {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+        }
+        
+        .sync-text.syncing {
+            color: #e67e22;
+        }
+        
+        .sync-text.synced {
+            color: #27ae60;
+        }
+        
+        .sync-text.loading {
+            color: #2980b9;
+        }
+        
+        .sync-text.error {
+            color: #c0392b;
+        }
+        
+        /* Sync Status Detail Text */
+        .sync-detail {
+            font-size: 0.65rem;
+            color: #7f8c8d;
+            margin-left: 4px;
+        }
+        
+        /* Sync Last Update */
+        .sync-last-update {
+            font-size: 0.6rem;
+            color: #95a5a6;
+            margin-left: 6px;
+            font-weight: 400;
+        }
+        
+        /* Animations */
+        @keyframes glowPulse {
+            0%, 100% {
+                box-shadow: 0 0 15px rgba(243, 156, 18, 0.15);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(243, 156, 18, 0.35);
+            }
+        }
+        
+        @keyframes pulseDot {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.6;
+            }
+        }
+        
+        @keyframes shake {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            25% {
+                transform: translateX(-8px);
+            }
+            75% {
+                transform: translateX(8px);
+            }
+        }
+        
+        /* Sync Status Icon */
+        .sync-icon {
+            font-size: 0.85rem;
+            transition: transform 0.6s ease;
+        }
+        
+        .sync-icon.syncing {
+            animation: spin 1.5s linear infinite;
+        }
+        
+        .sync-icon.synced {
+            color: #27ae60;
+        }
+        
+        .sync-icon.error {
+            color: #c0392b;
+        }
+        
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
         .btn-icon {
             background: #f0f4f9;
             border: none;
@@ -227,11 +384,12 @@
             </div>
             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                 <div class="clock-area"><div class="clock-date" id="hkDate">Loading...</div><div class="clock-time" id="hkTime">--:--:--</div></div>
-                <div id="syncStatusContainer" class="sync-status">
-                    <span style="font-size: 0.7rem; font-weight: 600; color: #4a627a;">SYNC</span>
-                    <span id="syncStatusIndicator" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #cbdde6;"></span>
-                    <span id="syncStatusText" style="font-size: 0.75rem; color: #4a627a; font-weight: 500;">Idle</span>
-                    <span id="syncLastUpdate" style="font-size: 0.65rem; color: #7a9aaa;"></span>
+                <div id="syncStatusContainer" class="sync-status idle">
+                    <i id="syncStatusIcon" class="fas fa-cloud sync-icon idle"></i>
+                    <span id="syncStatusIndicator" class="sync-indicator idle"></span>
+                    <span id="syncStatusText" class="sync-text idle">Idle</span>
+                    <span id="syncStatusDetail" class="sync-detail">● Ready</span>
+                    <span id="syncLastUpdate" class="sync-last-update"></span>
                 </div>
             </div>
         </div>
@@ -671,72 +829,137 @@
 
     // ==================== SYNC STATUS MANAGEMENT ====================
     let syncStatusTimeout = null;
+    let syncCount = 0;
     
-    function updateSyncStatus(status, message, isError = false) {
+    function updateSyncStatus(status, message, detail = '', count = 0) {
+        const container = document.getElementById('syncStatusContainer');
         const indicator = document.getElementById('syncStatusIndicator');
         const text = document.getElementById('syncStatusText');
-        const container = document.getElementById('syncStatusContainer');
+        const detailEl = document.getElementById('syncStatusDetail');
         const lastUpdate = document.getElementById('syncLastUpdate');
-        const now = new Date().toLocaleTimeString('en-HK', {hour12: false});
+        const icon = document.getElementById('syncStatusIcon');
+        const now = new Date().toLocaleTimeString('en-HK', { hour12: false });
         
-        // Reset classes
+        // Reset all classes
         container.className = 'sync-status';
+        indicator.className = 'sync-indicator';
+        text.className = 'sync-text';
+        icon.className = 'sync-icon';
+        
+        // Remove any existing animation classes
+        container.style.animation = 'none';
         
         switch(status) {
             case 'idle':
-                indicator.style.background = '#cbdde6';
+                container.classList.add('idle');
+                indicator.classList.add('idle');
+                text.classList.add('idle');
+                icon.className = 'fas fa-cloud sync-icon idle';
                 text.textContent = 'Idle';
+                detailEl.textContent = '● Ready';
+                lastUpdate.textContent = '';
                 break;
+                
             case 'syncing':
                 container.classList.add('syncing');
-                indicator.style.background = '#f39c12';
-                indicator.style.animation = 'pulse 1s infinite';
-                text.textContent = message || 'Syncing...';
+                indicator.classList.add('syncing');
+                text.classList.add('syncing');
+                icon.className = 'fas fa-sync-alt sync-icon syncing';
+                text.textContent = 'Syncing...';
+                detailEl.textContent = detail || '● In progress';
+                lastUpdate.textContent = '';
                 break;
+                
             case 'synced':
                 container.classList.add('synced');
-                indicator.style.background = '#2ecc71';
-                indicator.style.animation = 'none';
-                text.textContent = message || 'Synced';
+                indicator.classList.add('synced');
+                text.classList.add('synced');
+                icon.className = 'fas fa-check-circle sync-icon synced';
+                text.textContent = 'Sync Complete';
+                detailEl.textContent = detail || '✓ All data synced';
                 lastUpdate.textContent = `Last: ${now}`;
+                // Auto revert to idle after 5 seconds
+                if (syncStatusTimeout) clearTimeout(syncStatusTimeout);
+                syncStatusTimeout = setTimeout(() => {
+                    if (container.classList.contains('synced')) {
+                        updateSyncStatus('idle');
+                    }
+                }, 5000);
                 break;
+                
+            case 'loading':
+                container.classList.add('loading');
+                indicator.classList.add('loading');
+                text.classList.add('loading');
+                icon.className = 'fas fa-cloud-download-alt sync-icon loading';
+                text.textContent = 'Loading...';
+                detailEl.textContent = detail || '● Fetching data';
+                lastUpdate.textContent = '';
+                break;
+                
             case 'error':
                 container.classList.add('error');
-                indicator.style.background = '#e74c3c';
-                indicator.style.animation = 'none';
-                text.textContent = message || 'Error';
+                indicator.classList.add('error');
+                text.classList.add('error');
+                icon.className = 'fas fa-exclamation-triangle sync-icon error';
+                text.textContent = 'Sync Failed';
+                detailEl.textContent = detail || '● Error occurred';
+                lastUpdate.textContent = `Last: ${now}`;
+                // Auto revert to idle after 6 seconds
+                if (syncStatusTimeout) clearTimeout(syncStatusTimeout);
+                syncStatusTimeout = setTimeout(() => {
+                    if (container.classList.contains('error')) {
+                        updateSyncStatus('idle');
+                    }
+                }, 6000);
                 break;
-            case 'loading':
-                container.classList.add('syncing');
-                indicator.style.background = '#3498db';
-                indicator.style.animation = 'pulse 1s infinite';
-                text.textContent = message || 'Loading...';
+                
+            case 'refresh':
+                container.classList.add('loading');
+                indicator.classList.add('loading');
+                text.classList.add('loading');
+                icon.className = 'fas fa-sync-alt sync-icon loading';
+                text.textContent = 'Refreshing...';
+                detailEl.textContent = detail || '● Updating view';
+                lastUpdate.textContent = '';
                 break;
         }
     }
     
-    // Add pulse animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(0.8); }
-            100% { opacity: 1; transform: scale(1); }
+    // Add pulse animation style
+    const syncStyle = document.createElement('style');
+    syncStyle.textContent = `
+        @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(243, 156, 18, 0.15); }
+            50% { box-shadow: 0 0 30px rgba(243, 156, 18, 0.35); }
+        }
+        @keyframes pulseDot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
         }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(syncStyle);
     
     // Update the sync functions to use the status
     // Modify loadFromSupabase function
     async function loadFromSupabase() {
         if (!isSupabaseAvailable()) {
-            updateSyncStatus('error', 'Supabase unavailable');
+            updateSyncStatus('error', 'Supabase unavailable', '● Connection failed');
             toastMsg('Supabase not available. Using local data.');
             return false;
         }
         
         try {
-            updateSyncStatus('loading', 'Loading from cloud...');
+            updateSyncStatus('loading', 'Loading from cloud...', '● Fetching equipment data');
             toastMsg('Loading from cloud...');
             
             // Load equipment
@@ -747,6 +970,8 @@
             
             if (eqError) throw eqError;
             
+            updateSyncStatus('loading', 'Loading from cloud...', '● Fetching maintenance records');
+            
             // Load logs for each equipment
             const { data: logsData, error: logError } = await supabaseClient
                 .from('logs')
@@ -754,6 +979,8 @@
                 .order('id');
             
             if (logError) throw logError;
+            
+            updateSyncStatus('loading', 'Loading from cloud...', '● Fetching audit trail');
             
             // Load audit logs
             const { data: auditData, error: auditError } = await supabaseClient
@@ -800,12 +1027,14 @@
             
             renderEquipmentGrid();
             populateFilterDropdowns();
-            updateSyncStatus('synced', 'Cloud loaded');
-            toastMsg('Data loaded from cloud successfully');
+            
+            const count = equipmentDB.length;
+            updateSyncStatus('synced', 'Sync Complete', `✓ ${count} equipment loaded`);
+            toastMsg(`Data loaded from cloud successfully (${count} equipment)`);
             return true;
         } catch (error) {
             console.error('Error loading from Supabase:', error);
-            updateSyncStatus('error', 'Load failed');
+            updateSyncStatus('error', 'Sync Failed', '● ' + error.message);
             toastMsg('Failed to load from cloud: ' + error.message);
             return false;
         }
@@ -814,21 +1043,24 @@
     // Modify syncToSupabase function
     async function syncToSupabase() {
         if (!isSupabaseAvailable()) {
-            updateSyncStatus('error', 'Supabase unavailable');
+            updateSyncStatus('error', 'Sync Failed', '● Supabase unavailable');
             toastMsg('Supabase not available. Please check your connection.');
             return false;
         }
         
         try {
-            updateSyncStatus('syncing', 'Syncing to cloud...');
+            updateSyncStatus('syncing', 'Syncing...', '● Preparing data');
             toastMsg('Syncing to cloud...');
             let syncCount = 0;
             
             // Sync all equipment
             for (const eq of equipmentDB) {
+                updateSyncStatus('syncing', 'Syncing...', `● Processing: ${eq.manuf || ''} ${eq.model || ''}`);
                 await saveEquipmentToSupabase(eq);
                 syncCount++;
             }
+            
+            updateSyncStatus('syncing', 'Syncing...', '● Saving audit logs');
             
             // Sync audit logs (only last 100 to avoid rate limits)
             const recentAuditLogs = auditLogs.slice(0, 100);
@@ -836,12 +1068,12 @@
                 await saveAuditLogToSupabase(log);
             }
             
-            updateSyncStatus('synced', `${syncCount} items synced`);
+            updateSyncStatus('synced', 'Sync Complete', `✓ ${syncCount} equipment synced`);
             toastMsg('Sync completed! ' + syncCount + ' equipment synced.');
             return true;
         } catch (error) {
             console.error('Sync error:', error);
-            updateSyncStatus('error', 'Sync failed');
+            updateSyncStatus('error', 'Sync Failed', '● ' + error.message);
             toastMsg('Sync failed: ' + error.message);
             return false;
         }
@@ -1481,8 +1713,11 @@
             if (confirm("Sync all data to the cloud? This will overwrite cloud data with your local data.")) {
                 await syncToSupabase();
                 addAuditLog("SYNC_TO_CLOUD", "N/A", "Manual sync to cloud performed");
+            } else {
+                updateSyncStatus('idle');
             }
         } else {
+            updateSyncStatus('error', 'Sync Failed', '● Supabase unavailable');
             toastMsg("Supabase is not available. Please check your internet connection and Supabase configuration.");
         }
     };
@@ -1494,28 +1729,30 @@
                 if (success) {
                     renderEquipmentGrid();
                     populateFilterDropdowns();
-                    toastMsg("Loaded from cloud successfully");
                     addAuditLog("LOAD_FROM_CLOUD", "N/A", "Manual load from cloud performed");
                 }
+            } else {
+                updateSyncStatus('idle');
             }
         } else {
+            updateSyncStatus('error', 'Sync Failed', '● Supabase unavailable');
             toastMsg("Supabase is not available. Please check your internet connection and Supabase configuration.");
         }
     };
-
-    // Refresh DB button - reload from cloud and update local
+    
+    // ==================== REFRESH DB BUTTON ====================
     document.getElementById("refreshDBBtn").onclick = async () => {
         if (isSupabaseAvailable()) {
             if (confirm("Refresh database from cloud? This will:\n1. Load latest data from cloud\n2. Update your local view\n3. Resolve any conflicts")) {
-                updateSyncStatus('loading', 'Refreshing from cloud...');
+                updateSyncStatus('refresh', 'Refreshing...', '● Syncing with cloud');
                 const success = await loadFromSupabase();
                 if (success) {
                     renderEquipmentGrid();
                     populateFilterDropdowns();
-                    updateSyncStatus('synced', 'Database refreshed');
-                    toastMsg('Database refreshed from cloud successfully');
                     addAuditLog("REFRESH_DATABASE", "N/A", "Manual database refresh from cloud performed");
                 }
+            } else {
+                updateSyncStatus('idle');
             }
         } else {
             // Fallback to local refresh
@@ -1523,6 +1760,7 @@
             populateFilterDropdowns();
             toastMsg('Database refreshed from local storage');
             addAuditLog("REFRESH_DATABASE_LOCAL", "N/A", "Manual database refresh from local storage performed");
+            updateSyncStatus('synced', 'Refresh Complete', '✓ Local data refreshed');
         }
     };
 
@@ -1603,12 +1841,14 @@
     // ==================== INITIALIZATION ====================
     async function initializeApp() {
         loadAuditLogs();
+        updateSyncStatus('idle');
         
         // Try to load from cloud first if available
         if (isSupabaseAvailable()) {
+            updateSyncStatus('loading', 'Loading...', '● Connecting to cloud');
             const cloudSuccess = await loadFromSupabase();
             if (cloudSuccess) {
-                toastMsg('Database loaded from cloud');
+                // Status already updated by loadFromSupabase
                 return;
             }
         }
@@ -1620,12 +1860,14 @@
             renderEquipmentGrid();
             populateFilterDropdowns();
             toastMsg('Loaded from local storage');
+            updateSyncStatus('idle', 'Idle', '● Local data loaded');
             addAuditLog("PAGE_LOAD", "N/A", "Database loaded from local storage");
         } else {
             equipmentDB = JSON.parse(JSON.stringify(fullBackupData.equipment));
             renderEquipmentGrid();
             populateFilterDropdowns();
             toastMsg('Loaded from default backup');
+            updateSyncStatus('idle', 'Idle', '● Default data loaded');
             addAuditLog("PAGE_LOAD", "N/A", "Database initialized with default backup data");
         }
     }
