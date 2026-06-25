@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>NTWC DR Equipment Logging Database | Professional Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            color: #1e2a3e;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .db-container { max-width: 1600px; margin: 0 auto; }
+        .db-header {
+            background: linear-gradient(125deg, #ffffff 0%, #f8fbfe 100%);
+            border-radius: 32px;
+            padding: 1.2rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border: 1px solid rgba(27,127,140,0.2);
+        }
+        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .title-section h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #0b3b5f, #1b7f8c, #2aa5b3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .title-section p { color: #4a627a; font-size: 0.8rem; margin-top: 4px; }
+        .clock-area {
+            background: linear-gradient(145deg, #1b7f8c, #0f5f69);
+            padding: 0.5rem 1.2rem;
+            border-radius: 60px;
+            text-align: center;
+            color: white;
+        }
+        .clock-date { font-size: 0.7rem; opacity: 0.9; }
+        .clock-time { font-size: 1.3rem; font-weight: 700; font-family: monospace; }
+        .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn-icon {
+            background: #f0f4f9;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #1e466e;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: linear-gradient(95deg, #1b7f8c, #146b76); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(27,127,140,0.3);}
+        .btn-success { background: linear-gradient(95deg, #2b9348, #1f7a3e); color: white; }
+        .btn-warning { background: #ffedd5; color: #b45309; }
+        .btn-danger { background: linear-gradient(95deg, #e05a5a, #c13b3b); color: white; }
+        .btn-icon:hover { transform: translateY(-2px); filter: brightness(0.97);}
+        .filters-panel {
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 28px;
+            padding: 1.2rem 1.8rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(27,127,140,0.3);
+        }
+        .search-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+        .search-group { flex: 1; min-width: 140px; }
+        .search-group label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #1b7f8c; }
+        .search-group input, .search-group select { width: 100%; padding: 8px 12px; border-radius: 20px; border: 1px solid #cbdde6; background: white; font-size: 0.85rem; }
+        .selection-bar {
+            background: linear-gradient(95deg, #f0f9fa, #ffffff);
+            border-radius: 20px;
+            padding: 12px 20px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .equipment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 1.5rem;
+        }
+        .equipment-card {
+            background: white;
+            border-radius: 28px;
+            overflow: hidden;
+            transition: all 0.2s;
+            border: 1px solid #e0edf2;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.05);
+        }
+        .equipment-card.selected { border: 3px solid #1b7f8c; background: #f0fbfd; }
+        .card-header { padding: 1rem 1.2rem; background: #fafefe; border-bottom: 2px solid #d4eaf0; display: flex; justify-content: space-between; }
+        .equip-title h3 { font-weight: 700; color: #0f3b4a; }
+        .location-badge { background: #d9eff3; padding: 3px 12px; border-radius: 40px; font-size: 0.7rem; display: inline-block; margin-top: 5px; }
+        .card-body { padding: 1rem 1.2rem; }
+        .detail-row { display: flex; justify-content: space-between; font-size: 0.8rem; margin: 6px 0; border-bottom: 1px dashed #eef2f6; padding-bottom: 5px; }
+        .btn-view-log { background: #eef2ff; border: none; width: 100%; padding: 8px; border-radius: 40px; font-weight: 600; margin-top: 10px; cursor: pointer; }
+        .checkbox-select { transform: scale(1.2); margin-right: 8px; cursor: pointer; }
+        .modal {
+            display: none;
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 1300px;
+            max-height: 85vh;
+            border-radius: 36px;
+            overflow-y: auto;
+            padding: 1.8rem 2.2rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+        .log-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .log-table th, .log-table td { border: 1px solid #dce5ec; padding: 8px 6px; vertical-align: top; }
+        .audit-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .audit-table th, .audit-table td { border: 1px solid #dce5ec; padding: 10px 8px; }
+        .form-group { margin-bottom: 0; }
+        .form-group label { font-weight: 600; color: #146b76; display: block; margin-bottom: 4px; font-size: 0.85rem; }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; 
+            padding: 10px 12px; 
+            border-radius: 10px; 
+            border: 1px solid #d0e0e8; 
+            background: #fafcfd;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #1b7f8c;
+            box-shadow: 0 0 0 3px rgba(27,127,140,0.1);
+        }
+        .toast-msg { position: fixed; bottom: 30px; right: 30px; background: #1e2a3e; color: white; padding: 12px 24px; border-radius: 60px; z-index: 1100; font-size: 0.85rem; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .guide-content { font-size: 0.9rem; line-height: 1.5; background: #f9fbfd; padding: 1rem; border-radius: 24px; }
+        .guide-content ul { margin-left: 1.5rem; }
+        .guide-content li { margin: 8px 0; }
+        .export-dropdown { position: relative; display: inline-block; }
+        .export-menu { display: none; position: absolute; top: 45px; right: 0; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 200; min-width: 160px; overflow: hidden; }
+        .export-menu button { width: 100%; padding: 10px; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.85rem; }
+        .export-menu button:hover { background: #eef2ff; }
+        .edit-log-btn { background: #2b9348; color: white; border: none; padding: 2px 8px; border-radius: 30px; font-size: 0.7rem; cursor: pointer; margin-left: 4px; }
+        .delete-log-btn { background: #e05a5a; color: white; border: none; padding: 2px 8px; border-radius: 30px; font-size: 0.7rem; cursor: pointer; }
+        .equipment-section-title,
+        .record-section-title {
+            color: #0a4a5a;
+            font-weight: 700;
+            font-size: 1.05rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #d4e4ed;
+            padding-bottom: 10px;
+        }
+        .equipment-section-title i,
+        .record-section-title i {
+            color: #1b7f8c;
+        }
+        @media (max-width: 768px) {
+            #equipmentFields > div,
+            #recordFields > div {
+                grid-template-columns: 1fr !important;
+            }
+            .modal-content {
+                padding: 1.2rem 1.5rem !important;
+            }
+            #equipmentFields,
+            #recordFields {
+                padding: 15px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="db-container">
+    <div class="db-header">
+        <div class="header-row">
+            <div class="title-section">
+                <h1><i class="fas fa-database"></i> NTWC DR Equipment Logging Database</h1>
+                <p>CPH | POH | TMH | TSWH | YOP · Intelligent Asset Tracker</p>
+            </div>
+            <div class="clock-area"><div class="clock-date" id="hkDate">Loading...</div><div class="clock-time" id="hkTime">--:--:--</div></div>
+        </div>
+        <div class="header-row" style="margin-top: 12px;">
+            <div class="action-buttons">
+                <button id="guideBtn" class="btn-icon"><i class="fas fa-question-circle"></i> Guide</button>
+                <button id="auditBtn" class="btn-icon btn-warning"><i class="fas fa-history"></i> Audit Log</button>
+                <button id="backupBtn" class="btn-icon btn-primary"><i class="fas fa-download"></i> Backup</button>
+                <button id="restoreBtn" class="btn-icon"><i class="fas fa-upload"></i> Restore</button>
+                <button id="syncBtn" class="btn-icon btn-success"><i class="fas fa-cloud-upload-alt"></i> Sync to Cloud</button>
+                <button id="loadCloudBtn" class="btn-icon btn-primary"><i class="fas fa-cloud-download-alt"></i> Load from Cloud</button>
+                <div class="export-dropdown"><button id="exportBtn" class="btn-icon btn-success"><i class="fas fa-file-export"></i> Export ▼</button><div id="exportMenu" class="export-menu"><button id="exportCSV">CSV</button><button id="exportExcel">Excel (XLSX)</button><button id="exportPDF">PDF</button><button id="exportJPEG">JPEG Screenshot</button></div></div>
+                <button id="saveAllBtn" class="btn-icon"><i class="fas fa-save"></i> Save</button>
+                <button id="refreshBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button id="addEquipBtn" class="btn-icon btn-primary"><i class="fas fa-plus-circle"></i> New Equipment</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="filters-panel">
+        <div class="search-row">
+            <div class="search-group"><label>🔍 Search</label><input type="text" id="searchAll" placeholder="Search hospitals, locations, models..."></div>
+            <div class="search-group"><label>🏥 Hospital</label><select id="filterHospital"><option value="">All Hospitals</option></select></div>
+            <div class="search-group"><label>📍 Location</label><select id="filterLocation"><option value="">All Locations</option></select></div>
+            <div class="search-group"><label>⚙️ Manufacturer</label><select id="filterManufacturer"><option value="">All Manufacturers</option></select></div>
+            <div class="search-group"><label>📟 Model</label><select id="filterModel"><option value="">All Models</option></select></div>
+            <div class="search-group"><label>🔢 Serial/EAM</label><select id="filterSerialEam"><option value="">All</option></select></div>
+            <div class="search-group"><label>🔧 Maintenance Unit</label><select id="filterMaintenanceUnit"><option value="">All</option><option value="Workshop">Workshop</option><option value="Vendor">Vendor</option></select></div>
+            <button id="clearFilters" class="btn-icon"><i class="fas fa-times"></i> Clear</button>
+        </div>
+    </div>
+
+    <div class="selection-bar">
+        <div><i class="fas fa-check-double"></i> <strong>Compare & Export Mode</strong> — Select equipment below</div>
+        <div><button id="selectAllBtn" class="btn-icon">Select All</button><button id="clearSelectionBtn" class="btn-icon">Clear All</button><button id="compareBtn" class="btn-icon btn-primary">Compare (<span id="selectedCount">0</span>)</button></div>
+    </div>
+
+    <div id="equipmentListContainer" class="equipment-grid">Loading equipment...</div>
+</div>
+
+<!-- Log Modal -->
+<div id="logModal" class="modal"><div class="modal-content"><div class="flex-between"><h3 id="modalEquipTitle"><i class="fas fa-history"></i> Maintenance Logs</h3><button id="closeModalBtn" style="background:none;font-size:28px;">&times;</button></div><div style="overflow-x: auto;"><table class="log-table"><thead><tr><th>Date</th><th>ET/SET</th><th>Maintenance Jobs</th><th>Remark</th><th>Job Ref</th><th>Start</th><th>Finish</th><th>Other</th><th>Actions</th></tr></thead><tbody id="logTableBody"></tbody></table></div><div class="flex-between" style="margin-top:20px;"><button id="addRecordFromModal" class="btn-icon btn-primary">➕ Add Record</button><button id="closeModalFooter" class="btn-icon">Close</button></div></div></div>
+
+<!-- Audit Log Modal -->
+<div id="auditModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-history"></i> System Audit Log</h3><button id="closeAuditBtn" style="background:none;font-size:28px;">&times;</button></div><div style="overflow-x: auto; max-height: 70vh;"><table class="audit-table"><thead><tr><th>Timestamp (HK)</th><th>Action Type</th><th>User</th><th>Equipment</th><th>Details</th></tr></thead><tbody id="auditTableBody"></tbody></table></div><div class="flex-between" style="margin-top:20px;"><button id="clearAuditBtn" class="btn-icon btn-warning">Clear All Logs</button><button id="closeAuditFooterBtn" class="btn-icon">Close</button></div></div></div>
+
+<!-- Compare Modal -->
+<div id="compareModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-code-branch"></i> Equipment Comparison</h3><button id="closeCompareBtn" style="background:none;font-size:28px;">&times;</button></div><div id="compareContent" style="display:flex; gap:20px; flex-wrap:wrap;"></div></div></div>
+
+<!-- User Guide Modal -->
+<div id="guideModal" class="modal"><div class="modal-content"><div class="flex-between"><h3><i class="fas fa-life-ring"></i> 📘 User Guide</h3><button id="closeGuideBtn" style="background:none;font-size:28px;">&times;</button></div><div class="guide-content"><ul><li><i class="fas fa-search"></i> <strong>Real-time Filtering</strong> — Type in any search box, equipment list updates instantly.</li><li><i class="fas fa-check-square"></i> <strong>Select / Compare</strong> — Check equipment cards → click "Compare" to view side-by-side details and logs.</li><li><i class="fas fa-plus-circle"></i> <strong>Add/Edit Equipment</strong> — Click New Equipment or edit icon ✏️. Fill form; optionally add a log.</li><li><i class="fas fa-edit"></i> <strong>Edit/Delete Logs</strong> — Inside Logs window, click "Edit" or "Delete" on any log row.</li><li><i class="fas fa-database"></i> <strong>Backup & Restore</strong> — Backup saves JSON. Restore gives option to Overwrite or Merge.</li><li><i class="fas fa-file-export"></i> <strong>Export (CSV, Excel, PDF, JPEG)</strong> — Export selected equipment logs.</li><li><i class="fas fa-history"></i> <strong>Audit Log</strong> — Every action is tracked with timestamp. Click Audit Log button to view all changes.</li><li><i class="fas fa-cloud-upload-alt"></i> <strong>Cloud Sync</strong> — Click "Sync to Cloud" to save all data to Supabase. "Load from Cloud" retrieves the latest cloud data.</li><li><i class="fas fa-save"></i> <strong>Save & Refresh</strong> — Always save changes. Refresh reloads from storage.</li><li><strong>📊 Current Database:</strong> 44 Equipment Units, 247 Maintenance Records</li></ul><hr><p style="color:#1b7f8c;"><i class="fas fa-star-of-life"></i> All user actions are automatically recorded in the audit trail.</p></div></div></div>
+
+<!-- Universal Form Modal -->
+<div id="universalFormModal" class="modal"><div class="modal-content" style="max-width:850px; padding: 1.8rem 2.2rem; border-radius: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d4e4ed; padding-bottom: 15px; margin-bottom: 20px;">
+        <h3 id="universalFormTitle" style="font-size: 1.3rem; font-weight: 700; color: #0a4a5a;">
+            <i class="fas fa-edit" style="color: #1b7f8c; margin-right: 10px;"></i> Form
+        </h3>
+        <button id="closeUniversalModal" style="background: none; border: none; font-size: 28px; color: #6a8a9a; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='#c0392b'" onmouseout="this.style.color='#6a8a9a'">&times;</button>
+    </div>
+    <form id="universalForm">
+    <input type="hidden" id="formMode" value="equipment">
+    <input type="hidden" id="editEquipId" value="">
+<div id="equipmentFields" style="background: linear-gradient(135deg, #f8fafc 0%, #f0f4f7 100%); border-radius: 16px; padding: 20px 22px; margin-bottom: 12px; border: 1px solid #dce8ee;">
+    <div class="equipment-section-title">
+        <i class="fas fa-cube"></i> Equipment Information
+        <span style="font-size: 0.7rem; font-weight: 400; color: #3a5f6e; margin-left: auto;">* Required fields</span>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Hospital <span style="color: #c0392b;">*</span></label>
+            <input id="formHosp" required style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="e.g., TMH">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Location <span style="color: #c0392b;">*</span></label>
+            <input id="formLoc" required style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="e.g., ACC Room 2">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Manufacturer</label>
+            <input id="formManuf" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="e.g., Siemens">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Model <span style="color: #c0392b;">*</span></label>
+            <input id="formModel" required style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="e.g., DPX Evo">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Serial Number</label>
+            <input id="formSerial" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="Serial #">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">EAM</label>
+            <input id="formEam" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="EAM number">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Maintenance Unit</label>
+            <select id="formMaintenanceUnit" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;">
+                <option value="" style="color:#3a5f6e;">Select...</option>
+                <option value="Workshop" style="color:#0d2c3a;">Workshop</option>
+                <option value="Vendor" style="color:#0d2c3a;">Vendor</option>
+            </select>
+        </div>
+    </div>
+</div>
+<div id="recordFields" style="margin-top: 15px; border-top: 2px solid #dce8ee; padding-top: 15px; background: linear-gradient(135deg, #fafcfd 0%, #f5f8fa 100%); border-radius: 16px; padding: 20px 22px;">
+    <div class="record-section-title">
+        <i class="fas fa-clipboard-list"></i> Maintenance Record
+        <span style="font-size: 0.7rem; font-weight: 400; color: #3a5f6e; margin-left: auto;">Optional fields</span>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Date <span style="color: #c0392b;">*</span></label>
+            <input type="date" id="formLogDate" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">ET/SET</label>
+            <input id="formLogEt" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="Engineer name">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Job Ref No.</label>
+            <input id="formLogRef" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="WO/ref number">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Maintenance Jobs</label>
+            <textarea id="formLogJobs" rows="3" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a; resize:vertical;" placeholder="Describe the maintenance work performed"></textarea>
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Remark</label>
+            <input id="formLogRemark" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="Additional notes">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Start Time</label>
+            <input id="formLogStart" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="09:00:00">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Finish Time</label>
+            <input id="formLogFinish" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="17:00:00">
+        </div>
+        <div class="form-group">
+            <label style="font-weight: 700; color: #0a4a5a; font-size: 0.8rem;">Other ET/SET</label>
+            <input id="formLogOther" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #b8ced9; background:#ffffff; font-size:0.9rem; color:#0d2c3a;" placeholder="Other engineers">
+        </div>
+    </div>
+    <div style="margin-top: 12px; font-size: 0.75rem; color: #4a6a7a; background: #eef4f8; padding: 8px 14px; border-radius: 8px;">
+        <i class="fas fa-info-circle" style="color: #146b76;"></i> <span style="color: #0a4a5a; font-weight: 500;">Tip:</span> Fields marked with <span style="color: #c0392b;">*</span> are recommended for better tracking
+    </div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; border-top: 2px solid #d4e4ed; padding-top: 20px;">
+    <button type="submit" class="btn-primary btn-icon" style="padding: 12px 36px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, #1b7f8c, #146b76); color: white; border: none; border-radius: 40px; cursor: pointer; box-shadow: 0 4px 12px rgba(27,127,140,0.3); transition: all 0.3s;">
+        <i class="fas fa-save"></i> Save Changes
+    </button>
+    <button type="button" id="cancelUniversalBtn" class="btn-icon" style="padding: 12px 32px; font-size: 0.95rem; font-weight: 600; background: #e8eef3; color: #1a3f4e; border: none; border-radius: 40px; cursor: pointer; transition: all 0.2s;">
+        <i class="fas fa-times"></i> Cancel
+    </button>
+</div>
+</form></div></div>
+
+<script>
+    // ==================== SUPABASE CONFIGURATION ====================
+    // IMPORTANT: Replace these with your actual Supabase credentials
+    const SUPABASE_URL = 'https://zxipsjhpdizckdxovjqq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4aXBzamhwZGl6Y2tkeG92anFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNTkwNDgsImV4cCI6MjA5NzkzNTA0OH0.xWEYr3LSpmNEdLrqmWCMlwr2CkOCjm34RAHWR4R3eq8';
+
+    // Initialize Supabase client - check if it exists already
+    let supabaseClient = null;
+    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('Supabase initialized successfully');
+    } else {
+        console.warn('Supabase library not loaded - running in offline mode');
+    }
+
+    // Helper function to check Supabase availability
+    function isSupabaseAvailable() {
+        return supabaseClient !== null && typeof supabaseClient.from === 'function';
+    }
+
+    // ==================== CLOUD SYNC FUNCTIONS ====================
+    
+    // Load data from Supabase
+    async function loadFromSupabase() {
+        if (!isSupabaseAvailable()) {
+            toastMsg('Supabase not available. Using local data.');
+            return false;
+        }
+        
+        try {
+            toastMsg('Loading from cloud...');
+            
+            // Load equipment
+            const { data: equipmentData, error: eqError } = await supabaseClient
+                .from('equipment')
+                .select('*')
+                .order('id');
+            
+            if (eqError) throw eqError;
+            
+            // Load logs for each equipment
+            const { data: logsData, error: logError } = await supabaseClient
+                .from('logs')
+                .select('*')
+                .order('id');
+            
+            if (logError) throw logError;
+            
+            // Load audit logs
+            const { data: auditData, error: auditError } = await supabaseClient
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(500);
+            
+            if (auditError) throw auditError;
+            
+            // Reconstruct equipment with logs
+            equipmentDB = equipmentData.map(eq => ({
+                hosp: eq.hosp,
+                loc: eq.loc,
+                manuf: eq.manuf,
+                model: eq.model,
+                serial: eq.serial,
+                eam: eq.eam,
+                maintenanceUnit: eq.maintenance_unit,
+                logs: logsData.filter(log => log.equipment_id === eq.id).map(log => ({
+                    date: log.date,
+                    et: log.et,
+                    jobs: log.jobs,
+                    remark: log.remark,
+                    ref: log.ref,
+                    start: log.start_time,
+                    finish: log.finish_time,
+                    other: log.other_et
+                }))
+            }));
+            
+            // Reconstruct audit logs
+            auditLogs = auditData.map(log => ({
+                timestamp: log.timestamp,
+                action: log.action,
+                user: log.user_name,
+                equipment: log.equipment,
+                details: log.details
+            }));
+            
+            // Update local storage as backup
+            localStorage.setItem('NTWC_MPU_DB', JSON.stringify(equipmentDB));
+            localStorage.setItem('NTWC_MPU_AUDIT', JSON.stringify(auditLogs));
+            
+            renderEquipmentGrid();
+            populateFilterDropdowns();
+            toastMsg('Data loaded from cloud successfully');
+            return true;
+        } catch (error) {
+            console.error('Error loading from Supabase:', error);
+            toastMsg('Failed to load from cloud: ' + error.message);
+            return false;
+        }
+    }
+
+    // Save equipment to Supabase
+    async function saveEquipmentToSupabase(equipment) {
+        if (!isSupabaseAvailable()) {
+            console.warn('Supabase not available, skipping save');
+            return null;
+        }
+        
+        try {
+            // Check if equipment exists by serial and model
+            const { data: existing, error: checkError } = await supabaseClient
+                .from('equipment')
+                .select('id')
+                .eq('serial', equipment.serial || '')
+                .eq('model', equipment.model)
+                .maybeSingle();
+            
+            let equipmentId;
+            
+            if (existing) {
+                // Update existing
+                const { data, error } = await supabaseClient
+                    .from('equipment')
+                    .update({
+                        hosp: equipment.hosp,
+                        loc: equipment.loc,
+                        manuf: equipment.manuf,
+                        model: equipment.model,
+                        serial: equipment.serial,
+                        eam: equipment.eam,
+                        maintenance_unit: equipment.maintenanceUnit,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                    .select();
+                
+                if (error) throw error;
+                equipmentId = existing.id;
+            } else {
+                // Insert new
+                const { data, error } = await supabaseClient
+                    .from('equipment')
+                    .insert({
+                        hosp: equipment.hosp,
+                        loc: equipment.loc,
+                        manuf: equipment.manuf,
+                        model: equipment.model,
+                        serial: equipment.serial,
+                        eam: equipment.eam,
+                        maintenance_unit: equipment.maintenanceUnit
+                    })
+                    .select();
+                
+                if (error) throw error;
+                equipmentId = data[0].id;
+            }
+            
+            // Delete existing logs for this equipment
+            await supabaseClient
+                .from('logs')
+                .delete()
+                .eq('equipment_id', equipmentId);
+            
+            // Insert new logs
+            if (equipment.logs && equipment.logs.length > 0) {
+                const logsToInsert = equipment.logs.map(log => ({
+                    equipment_id: equipmentId,
+                    date: log.date || '',
+                    et: log.et || '',
+                    jobs: log.jobs || '',
+                    remark: log.remark || '',
+                    ref: log.ref || '',
+                    start_time: log.start || '',
+                    finish_time: log.finish || '',
+                    other_et: log.other || ''
+                }));
+                
+                const { error: logError } = await supabaseClient
+                    .from('logs')
+                    .insert(logsToInsert);
+                
+                if (logError) throw logError;
+            }
+            
+            return equipmentId;
+        } catch (error) {
+            console.error('Error saving equipment:', error);
+            throw error;
+        }
+    }
+
+    // Save audit log to Supabase
+    async function saveAuditLogToSupabase(auditLog) {
+        if (!isSupabaseAvailable()) {
+            console.warn('Supabase not available, skipping audit save');
+            return;
+        }
+        
+        try {
+            const { error } = await supabaseClient
+                .from('audit_logs')
+                .insert({
+                    timestamp: auditLog.timestamp,
+                    action: auditLog.action,
+                    user_name: auditLog.user || 'Current User',
+                    equipment: auditLog.equipment || 'N/A',
+                    details: auditLog.details || ''
+                });
+            
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error saving audit log:', error);
+        }
+    }
+
+    // Full sync: push local data to cloud
+    async function syncToSupabase() {
+        if (!isSupabaseAvailable()) {
+            toastMsg('Supabase not available. Please check your connection.');
+            return false;
+        }
+        
+        try {
+            toastMsg('Syncing to cloud...');
+            let syncCount = 0;
+            
+            // Sync all equipment
+            for (const eq of equipmentDB) {
+                await saveEquipmentToSupabase(eq);
+                syncCount++;
+            }
+            
+            // Sync audit logs (only last 100 to avoid rate limits)
+            const recentAuditLogs = auditLogs.slice(0, 100);
+            for (const log of recentAuditLogs) {
+                await saveAuditLogToSupabase(log);
+            }
+            
+            toastMsg('Sync completed! ' + syncCount + ' equipment synced.');
+            return true;
+        } catch (error) {
+            console.error('Sync error:', error);
+            toastMsg('Sync failed: ' + error.message);
+            return false;
+        }
+    }
+
+    // ==================== ORIGINAL DATABASE VARIABLES ====================
+    let equipmentDB = [];
+    let auditLogs = [];
+
+    // Load audit logs from localStorage or initialize
+    function loadAuditLogs() {
+        const stored = localStorage.getItem("NTWC_MPU_AUDIT");
+        if(stored) auditLogs = JSON.parse(stored);
+        else {
+            auditLogs = [{timestamp: new Date().toLocaleString("en-HK", {timeZone: "Asia/Hong_Kong", hour12: false}), action: "SYSTEM_INIT", user: "System", equipment: "N/A", details: "Database initialized with 44 equipment, 247 records"}];
+            saveAuditLogs();
+        }
+    }
+    
+    function saveAuditLogs() { 
+        localStorage.setItem("NTWC_MPU_AUDIT", JSON.stringify(auditLogs)); 
+    }
+    
+    // Override addAuditLog to also save to cloud
+    const originalAddAuditLog = window.addAuditLog || function() {};
+    function addAuditLog(action, equipmentName, details) {
+        const now = new Date();
+        const timestamp = now.toLocaleString("en-HK", {timeZone: "Asia/Hong_Kong", hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'});
+        const logEntry = {timestamp: timestamp, action: action, user: "Current User", equipment: equipmentName || "N/A", details: details || ""};
+        
+        // Add to local array
+        auditLogs.unshift(logEntry);
+        if(auditLogs.length > 500) auditLogs.pop();
+        saveAuditLogs();
+        
+        // Save to cloud (async, only if available)
+        if (isSupabaseAvailable()) {
+            saveAuditLogToSupabase(logEntry).catch(err => console.warn('Audit log cloud save failed:', err));
+        }
+    }
+
+    function showAuditLogModal() {
+        const tbody = document.getElementById("auditTableBody");
+        if(auditLogs.length === 0) tbody.innerHTML = "<tr><td colspan='5'>No audit records found</td></tr>";
+        else {
+            tbody.innerHTML = auditLogs.map(log => `<tr>
+                <td>${log.timestamp}</td>
+                <td><span style="background:${getActionColor(log.action)}; padding:2px 8px; border-radius:20px; font-size:0.7rem;">${log.action}</span></td>
+                <td>${log.user}</td>
+                <td>${log.equipment}</td>
+                <td style="max-width:300px;">${log.details}</td>
+            </tr>`).join('');
+        }
+        document.getElementById("auditModal").style.display = "flex";
+    }
+    
+    function getActionColor(action) {
+        if(action.includes("ADD")) return "#c8e6c9";
+        if(action.includes("EDIT") || action.includes("UPDATE")) return "#fff9c4";
+        if(action.includes("DELETE") || action.includes("REMOVE")) return "#ffcdd2";
+        if(action.includes("BACKUP") || action.includes("RESTORE")) return "#b3e5fc";
+        if(action.includes("EXPORT")) return "#e1bee7";
+        if(action.includes("SYNC") || action.includes("CLOUD")) return "#b2dfdb";
+        return "#e0e0e0";
+    }
+
+    // ==================== FULL BACKUP DATA ====================
+    const fullBackupData = {
+      "equipment": [
+        {"hosp":"CPH","loc":"X-ray Room","manuf":"Agfa","model":"DX-D600","serial":"A5430000167","eam":"847119","logs":[{"date":"2023-06-20","et":"Reeve","jobs":"Autoposition Overspeed Error. Replaced the OTC longitudinal motion drive...","remark":"Problem fixed","ref":"15058","start":"10:30:00","finish":"16:30:00","other":"Richard"}]},
+        {"hosp":"POH","loc":"5C Orthoscan","manuf":"Orthoscan","model":"TAU 15","serial":"5U0302","eam":"","logs":[{"date":"2023-11-21","et":"Joe","jobs":"New machine installation by vendor","remark":"Orthoscan Mini C-arm","ref":"15648","start":"10:00:00","finish":"13:00:00","other":""}]}
+      ]
+    };
+
+    // ==================== ORIGINAL FUNCTIONS (Preserved) ====================
+    
+    function saveToLocal() { 
+        localStorage.setItem("NTWC_MPU_DB", JSON.stringify(equipmentDB)); 
+        toastMsg("Database saved to local storage");
+        addAuditLog("SAVE_DATABASE", "N/A", "User manually saved database");
+    }
+    
+    function loadFromLocal() { 
+        const stored = localStorage.getItem("NTWC_MPU_DB"); 
+        if(stored) equipmentDB = JSON.parse(stored); 
+        else equipmentDB = JSON.parse(JSON.stringify(fullBackupData.equipment)); 
+        renderEquipmentGrid(); 
+        toastMsg("Database refreshed from local storage");
+        addAuditLog("REFRESH_DATABASE", "N/A", "Database refreshed from storage"); 
+    }
+    
+    function toastMsg(msg) { 
+        let d=document.createElement("div"); 
+        d.className="toast-msg"; 
+        d.innerText=msg; 
+        document.body.appendChild(d); 
+        setTimeout(()=>d.remove(),3000); 
+    }
+    
+    let selectedEquipIndices = new Set();
+    
+    function renderEquipmentGrid() {
+        let searchText = document.getElementById("searchAll").value.toLowerCase();
+        let hospital=document.getElementById("filterHospital").value;
+        let location=document.getElementById("filterLocation").value;
+        let manu=document.getElementById("filterManufacturer").value;
+        let model=document.getElementById("filterModel").value;
+        let serialEam=document.getElementById("filterSerialEam").value;
+        let maintenanceUnit=document.getElementById("filterMaintenanceUnit").value;
+        
+        let filtered = equipmentDB.filter((eq, idx) => {
+            let matchSearch = searchText==="" || 
+                eq.hosp.toLowerCase().includes(searchText) ||
+                (eq.loc||"").toLowerCase().includes(searchText) ||
+                (eq.manuf||"").toLowerCase().includes(searchText) ||
+                (eq.model||"").toLowerCase().includes(searchText) ||
+                (eq.serial||"").toLowerCase().includes(searchText) ||
+                (eq.eam||"").toLowerCase().includes(searchText);
+            
+            let matchHospital = hospital==="" || eq.hosp === hospital;
+            let matchLocation = location==="" || (eq.loc||"") === location;
+            let matchManu = manu==="" || (eq.manuf||"") === manu;
+            let matchModel = model==="" || (eq.model||"") === model;
+            let matchSerialEam = serialEam==="" || (eq.serial||"") === serialEam || (eq.eam||"") === serialEam;
+            let matchMaintenanceUnit = maintenanceUnit==="" || (eq.maintenanceUnit||"") === maintenanceUnit;
+            
+            return matchSearch && matchHospital && matchLocation && matchManu && matchModel && matchSerialEam && matchMaintenanceUnit;
+        });
+
+        const container = document.getElementById("equipmentListContainer");
+        if(filtered.length===0) { container.innerHTML="<div style='padding:2rem;background:white;border-radius:32px;'>No equipment matched</div>"; return; }
+        container.innerHTML = filtered.map(eq => { 
+            const originalIdx = equipmentDB.findIndex(e => e===eq); 
+            const isSelected = selectedEquipIndices.has(originalIdx); 
+            return `<div class="equipment-card ${isSelected ? 'selected' : ''}" data-original-idx="${originalIdx}"><div class="card-header"><div class="equip-title"><input type="checkbox" class="checkbox-select" data-idx="${originalIdx}" ${isSelected ? 'checked' : ''}> <h3 style="display:inline-block;">${eq.manuf||''} ${eq.model}</h3><div><span class="location-badge">${eq.hosp} · ${eq.loc||''}</span></div></div><div><button class="editEquipBtn" data-idx="${originalIdx}" style="background:none;border:none;"><i class="fas fa-edit"></i></button><button class="deleteEquipBtn" data-idx="${originalIdx}" style="background:none;border:none;"><i class="fas fa-trash-alt"></i></button></div></div><div class="card-body"><div class="detail-row"><span>Serial</span><span>${eq.serial||'—'}</span></div><div class="detail-row"><span>EAM</span><span>${eq.eam||'—'}</span></div><div class="detail-row"><span>Logs</span><span>${(eq.logs||[]).length} records</span></div><button class="btn-view-log" data-idx="${originalIdx}"><i class="fas fa-eye"></i> View Logs</button></div></div>`; 
+        }).join('');
+        attachCardEvents(); 
+        document.getElementById("selectedCount").innerText = selectedEquipIndices.size;
+    }
+    
+    function attachCardEvents() {
+        document.querySelectorAll(".checkbox-select").forEach(cb => cb.addEventListener("change", (e) => { let idx=parseInt(cb.getAttribute("data-idx")); if(cb.checked) selectedEquipIndices.add(idx); else selectedEquipIndices.delete(idx); renderEquipmentGrid(); }));
+        document.querySelectorAll(".editEquipBtn").forEach(btn => btn.addEventListener("click", (e) => { let idx=parseInt(btn.getAttribute("data-idx")); openEquipmentForm(idx); }));
+        document.querySelectorAll(".deleteEquipBtn").forEach(btn => btn.addEventListener("click", (e) => { if(confirm("Delete equipment permanently?")){ let idx=parseInt(btn.getAttribute("data-idx")); let eqName = equipmentDB[idx].manuf + " " + equipmentDB[idx].model; equipmentDB.splice(idx,1); selectedEquipIndices.clear(); saveToLocal(); renderEquipmentGrid(); addAuditLog("DELETE_EQUIPMENT", eqName, "Equipment permanently deleted"); toastMsg("Deleted"); } }));
+        document.querySelectorAll(".btn-view-log").forEach(btn => btn.addEventListener("click", (e) => { let idx=parseInt(btn.getAttribute("data-idx")); showLogModal(idx); }));
+    }
+
+    function populateFilterDropdowns() {
+        const hospitals = [...new Set(equipmentDB.map(eq => eq.hosp).filter(Boolean))].sort();
+        const locations = [...new Set(equipmentDB.map(eq => eq.loc).filter(Boolean))].sort();
+        const manufacturers = [...new Set(equipmentDB.map(eq => eq.manuf).filter(Boolean))].sort();
+        const models = [...new Set(equipmentDB.map(eq => eq.model).filter(Boolean))].sort();
+        const serials = [...new Set(equipmentDB.map(eq => eq.serial).filter(Boolean))].sort();
+        
+        const filterHospital = document.getElementById("filterHospital");
+        const filterLocation = document.getElementById("filterLocation");
+        const filterManufacturer = document.getElementById("filterManufacturer");
+        const filterModel = document.getElementById("filterModel");
+        const filterSerialEam = document.getElementById("filterSerialEam");
+        
+        const selectedHosp = filterHospital.value;
+        const selectedLoc = filterLocation.value;
+        const selectedManuf = filterManufacturer.value;
+        const selectedModel = filterModel.value;
+        const selectedSerial = filterSerialEam.value;
+        
+        filterHospital.innerHTML = '<option value="">All Hospitals</option>' + hospitals.map(h => `<option value="${h}">${h}</option>`).join('');
+        filterLocation.innerHTML = '<option value="">All Locations</option>' + locations.map(l => `<option value="${l}">${l}</option>`).join('');
+        filterManufacturer.innerHTML = '<option value="">All Manufacturers</option>' + manufacturers.map(m => `<option value="${m}">${m}</option>`).join('');
+        filterModel.innerHTML = '<option value="">All Models</option>' + models.map(m => `<option value="${m}">${m}</option>`).join('');
+        filterSerialEam.innerHTML = '<option value="">All</option>' + serials.map(s => `<option value="${s}">${s}</option>`).join('');
+        
+        filterHospital.value = selectedHosp;
+        filterLocation.value = selectedLoc;
+        filterManufacturer.value = selectedManuf;
+        filterModel.value = selectedModel;
+        filterSerialEam.value = selectedSerial;
+    }
+
+    function showLogModal(equipIdx) { 
+        window.currentEquipForLog = equipIdx; 
+        renderLogTable(equipIdx); 
+        document.getElementById("logModal").style.display = "flex"; 
+    }
+    
+    function renderLogTable(equipIdx) { 
+        const eq = equipmentDB[equipIdx]; 
+        document.getElementById("modalEquipTitle").innerHTML = `<i class="fas fa-history"></i> Logs: ${eq.manuf} ${eq.model} (${eq.hosp})`; 
+        const tbody = document.getElementById("logTableBody"); 
+        tbody.innerHTML = (eq.logs||[]).map((log, logIdx) => `<tr><td>${log.date||''}</td><td>${log.et||''}</td><td>${log.jobs||''}</td><td>${log.remark||''}</td><td>${log.ref||''}</td><td>${log.start||''}</td><td>${log.finish||''}</td><td>${log.other||''}</td><td><button class="edit-log-btn" data-logidx="${logIdx}">Edit</button> <button class="delete-log-btn" data-logidx="${logIdx}">Del</button></td></tr>`).join(''); 
+        if((eq.logs||[]).length===0) tbody.innerHTML="<tr><td colspan='9'>No records</td></tr>"; 
+        document.querySelectorAll(".edit-log-btn").forEach(btn => btn.addEventListener("click", (e) => { let logIdx = parseInt(btn.getAttribute("data-logidx")); openEditLogForm(equipIdx, logIdx); })); 
+        document.querySelectorAll(".delete-log-btn").forEach(btn => btn.addEventListener("click", (e) => { if(confirm("Delete this log?")){ let logIdx = parseInt(btn.getAttribute("data-logidx")); let logInfo = equipmentDB[equipIdx].logs[logIdx].date + " - " + (equipmentDB[equipIdx].logs[logIdx].jobs||"").substring(0,50); equipmentDB[equipIdx].logs.splice(logIdx,1); saveToLocal(); renderLogTable(equipIdx); renderEquipmentGrid(); addAuditLog("DELETE_LOG", equipmentDB[equipIdx].manuf + " " + equipmentDB[equipIdx].model, "Deleted log: " + logInfo); toastMsg("Log deleted"); } })); 
+    }
+
+    function openEditLogForm(equipIdx, logIdx) { 
+        const log = equipmentDB[equipIdx].logs[logIdx]; 
+        document.getElementById("formMode").value = "editLog"; 
+        document.getElementById("editEquipId").value = equipIdx; 
+        document.getElementById("formLogDate").value = log.date || ""; 
+        document.getElementById("formLogEt").value = log.et || ""; 
+        document.getElementById("formLogJobs").value = log.jobs || ""; 
+        document.getElementById("formLogRemark").value = log.remark || ""; 
+        document.getElementById("formLogRef").value = log.ref || ""; 
+        document.getElementById("formLogStart").value = log.start || ""; 
+        document.getElementById("formLogFinish").value = log.finish || ""; 
+        document.getElementById("formLogOther").value = log.other || ""; 
+        document.getElementById("universalFormTitle").innerHTML = "✏️ Edit Log Entry"; 
+        document.getElementById("universalFormModal").style.display = "flex"; 
+        window.editLogIndex = logIdx; 
+    }
+
+    function openEquipmentForm(equipId) { 
+        const eq = equipmentDB[equipId]; 
+        document.getElementById("formMode").value="equipment"; 
+        document.getElementById("editEquipId").value=equipId; 
+        document.getElementById("formHosp").value=eq.hosp; 
+        document.getElementById("formLoc").value=eq.loc||""; 
+        document.getElementById("formManuf").value=eq.manuf||""; 
+        document.getElementById("formModel").value=eq.model; 
+        document.getElementById("formSerial").value=eq.serial||""; 
+        document.getElementById("formEam").value=eq.eam||""; 
+        document.getElementById("formMaintenanceUnit").value=eq.maintenanceUnit||"";
+        document.getElementById("formLogDate").value="";
+        document.getElementById("formLogEt").value=""; 
+        document.getElementById("formLogJobs").value=""; 
+        document.getElementById("formLogRemark").value=""; 
+        document.getElementById("formLogRef").value=""; 
+        document.getElementById("formLogStart").value=""; 
+        document.getElementById("formLogFinish").value=""; 
+        document.getElementById("formLogOther").value=""; 
+        document.getElementById("universalFormTitle").innerText="✏️ Edit Equipment"; 
+        document.getElementById("universalFormModal").style.display="flex"; 
+    }
+
+    function openAddRecordForCurrent(equipIdx) { 
+        document.getElementById("formMode").value="record"; 
+        document.getElementById("editEquipId").value=equipIdx; 
+        document.getElementById("formLogDate").value=""; 
+        document.getElementById("formLogEt").value=""; 
+        document.getElementById("formLogJobs").value=""; 
+        document.getElementById("formLogRemark").value=""; 
+        document.getElementById("formLogRef").value=""; 
+        document.getElementById("formLogStart").value=""; 
+        document.getElementById("formLogFinish").value=""; 
+        document.getElementById("formLogOther").value=""; 
+        document.getElementById("universalFormTitle").innerHTML = "➕ Add Record"; 
+        document.getElementById("universalFormModal").style.display="flex"; 
+    }
+
+    // ==================== FORM SUBMIT HANDLER ====================
+    document.getElementById("universalForm").addEventListener("submit", function(e){ 
+        e.preventDefault(); 
+        let mode = document.getElementById("formMode").value; 
+        let idx = parseInt(document.getElementById("editEquipId").value); 
+
+        if(mode === "equipment") {
+            let hosp = document.getElementById("formHosp").value, 
+                loc = document.getElementById("formLoc").value, 
+                manuf = document.getElementById("formManuf").value, 
+                model = document.getElementById("formModel").value, 
+                serial = document.getElementById("formSerial").value, 
+                eam = document.getElementById("formEam").value, 
+                maintenanceUnit = document.getElementById("formMaintenanceUnit").value;
+            let newLog = null;
+            if(document.getElementById("formLogDate").value) newLog = { 
+                date: document.getElementById("formLogDate").value, 
+                et: document.getElementById("formLogEt").value, 
+                jobs: document.getElementById("formLogJobs").value, 
+                remark: document.getElementById("formLogRemark").value, 
+                ref: document.getElementById("formLogRef").value, 
+                start: document.getElementById("formLogStart").value, 
+                finish: document.getElementById("formLogFinish").value, 
+                other: document.getElementById("formLogOther").value 
+            }; 
+            if(idx === -1) { 
+                let newEq = {hosp, loc, manuf, model, serial, eam, logs: newLog ? [newLog] : [], maintenanceUnit: maintenanceUnit}; 
+                equipmentDB.push(newEq); 
+                addAuditLog("ADD_EQUIPMENT", manuf + " " + model, "New equipment added with " + (newLog ? "1 initial log" : "0 logs")); 
+                toastMsg("Equipment Added"); 
+            } else { 
+                let oldName = equipmentDB[idx].manuf + " " + equipmentDB[idx].model; 
+                equipmentDB[idx] = {...equipmentDB[idx], hosp, loc, manuf, model, serial, eam, logs: equipmentDB[idx].logs || [], maintenanceUnit: maintenanceUnit}; 
+                if(newLog && newLog.date) equipmentDB[idx].logs.push(newLog); 
+                addAuditLog("EDIT_EQUIPMENT", manuf + " " + model, "Equipment details updated" + (newLog ? " and 1 log added" : "")); 
+                toastMsg("Equipment Updated"); 
+            } 
+            saveToLocal(); 
+            renderEquipmentGrid(); 
+            populateFilterDropdowns();
+        } else if(mode === "record") { 
+            let newRec = { 
+                date: document.getElementById("formLogDate").value, 
+                et: document.getElementById("formLogEt").value, 
+                jobs: document.getElementById("formLogJobs").value, 
+                remark: document.getElementById("formLogRemark").value, 
+                ref: document.getElementById("formLogRef").value, 
+                start: document.getElementById("formLogStart").value, 
+                finish: document.getElementById("formLogFinish").value, 
+                other: document.getElementById("formLogOther").value 
+            }; 
+            if(newRec.date) { 
+                equipmentDB[idx].logs.push(newRec); 
+                saveToLocal(); 
+                renderEquipmentGrid(); 
+                if(window.currentEquipForLog === idx) renderLogTable(idx); 
+                addAuditLog("ADD_LOG", equipmentDB[idx].manuf + " " + equipmentDB[idx].model, "Added log: " + newRec.date + " - " + (newRec.jobs||"").substring(0,50)); 
+                toastMsg("Record added"); 
+            } 
+        } else if(mode === "editLog") { 
+            let logIdx = window.editLogIndex; 
+            let oldLog = equipmentDB[idx].logs[logIdx]; 
+            equipmentDB[idx].logs[logIdx] = { 
+                date: document.getElementById("formLogDate").value, 
+                et: document.getElementById("formLogEt").value, 
+                jobs: document.getElementById("formLogJobs").value, 
+                remark: document.getElementById("formLogRemark").value, 
+                ref: document.getElementById("formLogRef").value, 
+                start: document.getElementById("formLogStart").value, 
+                finish: document.getElementById("formLogFinish").value, 
+                other: document.getElementById("formLogOther").value 
+            }; 
+            saveToLocal(); 
+            renderEquipmentGrid(); 
+            if(window.currentEquipForLog === idx) renderLogTable(idx); 
+            addAuditLog("EDIT_LOG", equipmentDB[idx].manuf + " " + equipmentDB[idx].model, "Modified log from " + (oldLog.date||"") + " to " + (document.getElementById("formLogDate").value||"")); 
+            toastMsg("Log edited"); 
+        } 
+        document.getElementById("universalFormModal").style.display = "none"; 
+    });
+
+    // ==================== BUTTON HANDLERS ====================
+    
+    document.getElementById("backupBtn").onclick = () => { 
+        const now = new Date(); 
+        const yyyymmdd = now.toISOString().slice(0,10).replace(/-/g,''); 
+        const dataStr = JSON.stringify({equipment: equipmentDB},null,2); 
+        const blob = new Blob([dataStr],{type:"application/json"}); 
+        const a=document.createElement("a"); 
+        a.href=URL.createObjectURL(blob); 
+        a.download=`Equipment Logging Database Backup - ${yyyymmdd}.json`; 
+        a.click(); 
+        URL.revokeObjectURL(blob); 
+        addAuditLog("BACKUP_DATABASE", "N/A", `Backup created: ${yyyymmdd}`); 
+        toastMsg("Backup created"); 
+    };
+
+    document.getElementById("restoreBtn").onclick = () => { 
+        let inp=document.createElement("input"); 
+        inp.type="file"; 
+        inp.accept="application/json"; 
+        inp.onchange=e=>{ 
+            let file=e.target.files[0]; 
+            if(!file) return; 
+            let reader=new FileReader(); 
+            reader.onload=ev=>{ 
+                try{ 
+                    let restored=JSON.parse(ev.target.result); 
+                    let choice=confirm("Overwrite? OK = Replace all | Cancel = Merge (keep existing + add new)"); 
+                    if(choice) equipmentDB=restored.equipment || []; 
+                    else { 
+                        let incoming=restored.equipment||[]; 
+                        incoming.forEach(inc=>{ 
+                            if(!equipmentDB.some(eq=>eq.serial===inc.serial && eq.model===inc.model)) equipmentDB.push(inc); 
+                        }); 
+                    } 
+                    saveToLocal(); 
+                    renderEquipmentGrid(); 
+                    populateFilterDropdowns();
+                    addAuditLog("RESTORE_DATABASE", "N/A", choice ? "Overwrite mode" : "Merge mode"); 
+                    toastMsg("Restore done"); 
+                }catch(e){ toastMsg("Invalid file"); } 
+            }; 
+            reader.readAsText(file); 
+        }; 
+        inp.click(); 
+    };
+
+    document.getElementById("auditBtn").onclick = () => showAuditLogModal();
+    
+    document.getElementById("clearAuditBtn").onclick = () => { 
+        if(confirm("Clear all audit logs? This action cannot be undone.")) { 
+            auditLogs = []; 
+            saveAuditLogs(); 
+            showAuditLogModal(); 
+            addAuditLog("CLEAR_AUDIT", "N/A", "All audit logs cleared"); 
+            toastMsg("Audit logs cleared"); 
+        } 
+    };
+
+    document.getElementById("selectAllBtn").onclick = () => {
+        let searchText = document.getElementById("searchAll").value.toLowerCase();
+        let hospital=document.getElementById("filterHospital").value;
+        let location=document.getElementById("filterLocation").value;
+        let manu=document.getElementById("filterManufacturer").value;
+        let model=document.getElementById("filterModel").value;
+        let serialEam=document.getElementById("filterSerialEam").value;
+        let maintenanceUnit=document.getElementById("filterMaintenanceUnit").value;
+        
+        equipmentDB.forEach((eq, idx) => {
+            let matchSearch = searchText==="" || 
+                eq.hosp.toLowerCase().includes(searchText) ||
+                (eq.loc||"").toLowerCase().includes(searchText) ||
+                (eq.manuf||"").toLowerCase().includes(searchText) ||
+                (eq.model||"").toLowerCase().includes(searchText) ||
+                (eq.serial||"").toLowerCase().includes(searchText) ||
+                (eq.eam||"").toLowerCase().includes(searchText);
+            
+            let matchHospital = hospital==="" || eq.hosp === hospital;
+            let matchLocation = location==="" || (eq.loc||"") === location;
+            let matchManu = manu==="" || (eq.manuf||"") === manu;
+            let matchModel = model==="" || (eq.model||"") === model;
+            let matchSerialEam = serialEam==="" || (eq.serial||"") === serialEam || (eq.eam||"") === serialEam;
+            let matchMaintenanceUnit = maintenanceUnit==="" || (eq.maintenanceUnit||"") === maintenanceUnit;
+            
+            if(matchSearch && matchHospital && matchLocation && matchManu && matchModel && matchSerialEam && matchMaintenanceUnit) {
+                selectedEquipIndices.add(idx);
+            }
+        });
+        renderEquipmentGrid();
+        addAuditLog("SELECT_ALL_FILTERED", "N/A", "Selected all filtered equipment (" + selectedEquipIndices.size + " items)");
+        toastMsg("Selected " + selectedEquipIndices.size + " equipment from filtered results");
+    };
+
+    document.getElementById("clearSelectionBtn").onclick = () => { 
+        selectedEquipIndices.clear(); 
+        renderEquipmentGrid(); 
+    };
+
+    document.getElementById("compareBtn").onclick = () => { 
+        let selected = Array.from(selectedEquipIndices).map(i=>equipmentDB[i]); 
+        if(selected.length<2){ toastMsg("Select at least 2"); return; } 
+        let html = selected.map(eq=>`<div style="background:#f9f9ff; border-radius:20px; padding:1rem; flex:1; min-width:250px;"><h4>${eq.manuf} ${eq.model}</h4><p>🏥 ${eq.hosp}<br>📍 ${eq.loc}<br>🔢 ${eq.serial||'—'}<br>📋 Logs: ${eq.logs.length}</p><details><summary>Recent Logs</summary>${eq.logs.slice(0,5).map(l=>`📅 ${l.date}: ${l.jobs?.substring(0,50)}`).join('<br>')}</details></div>`).join(''); 
+        document.getElementById("compareContent").innerHTML=html; 
+        document.getElementById("compareModal").style.display="flex"; 
+    };
+
+    // ==================== EXPORT FUNCTIONS ====================
+    document.getElementById("exportCSV").onclick = () => { 
+        let selected=Array.from(selectedEquipIndices).map(i=>equipmentDB[i]); 
+        if(selected.length===0){ toastMsg("Select equipment first"); return; } 
+        let rows=[["Hospital","Location","Manufacturer","Model","Serial","EAM","Date","ET/SET","Jobs","Remark","Job Ref","Start","Finish","Other"]]; 
+        selected.forEach(eq=>{ eq.logs.forEach(log=>{ rows.push([eq.hosp,eq.loc,eq.manuf,eq.model,eq.serial,eq.eam,log.date,log.et,log.jobs,log.remark,log.ref,log.start,log.finish,log.other]); }); }); 
+        let csv=rows.map(r=>r.join(",")).join("\n"); 
+        let blob=new Blob([csv],{type:"text/csv"}); 
+        let a=document.createElement("a"); 
+        a.href=URL.createObjectURL(blob); 
+        a.download=`export_${new Date().toISOString().slice(0,10)}.csv`; 
+        a.click(); 
+        URL.revokeObjectURL(blob); 
+        addAuditLog("EXPORT_CSV", "N/A", `Exported ${selected.length} equipment, ${rows.length-1} records`); 
+    };
+
+    document.getElementById("exportExcel").onclick = () => { 
+        let selected=Array.from(selectedEquipIndices).map(i=>equipmentDB[i]); 
+        if(selected.length===0){ toastMsg("Select equipment"); return; } 
+        let data=[]; 
+        selected.forEach(eq=>{ eq.logs.forEach(log=>{ data.push({Hospital:eq.hosp,Location:eq.loc,Manufacturer:eq.manuf,Model:eq.model,Serial:eq.serial,EAM:eq.eam,Date:log.date,"ET/SET":log.et,"Jobs":log.jobs,Remark:log.remark,"Job Ref":log.ref,"Start":log.start,"Finish":log.finish,"Other":log.other}); }); }); 
+        let ws=XLSX.utils.json_to_sheet(data); 
+        let wb=XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb,ws,"Logs"); 
+        XLSX.writeFile(wb,`export_${new Date().toISOString().slice(0,10)}.xlsx`); 
+        addAuditLog("EXPORT_EXCEL", "N/A", `Exported ${selected.length} equipment`); 
+    };
+
+    document.getElementById("exportPDF").onclick = async () => { 
+        let selected=Array.from(selectedEquipIndices).map(i=>equipmentDB[i]); 
+        if(selected.length===0){ toastMsg("Select equipment"); return; } 
+        const {jsPDF}=window.jspdf; 
+        const doc=new jsPDF({orientation:"portrait",unit:"mm"}); 
+        let y=20; 
+        doc.setFontSize(16); 
+        doc.text("Equipment Maintenance Logs", 20, y); 
+        y+=8; 
+        for(let eq of selected){ 
+            doc.setFontSize(12); 
+            doc.text(`${eq.manuf} ${eq.model} (${eq.hosp} - ${eq.loc})`, 20, y); 
+            y+=6; 
+            doc.setFontSize(9); 
+            doc.text(`Serial: ${eq.serial||'N/A'}  EAM: ${eq.eam||'N/A'}`, 20, y); 
+            y+=6; 
+            doc.text("Logs:",20,y); 
+            y+=5; 
+            eq.logs.forEach(log=>{ 
+                let line=`${log.date} | ${log.et} | ${(log.jobs||'').substring(0,50)}`; 
+                if(y>270){ doc.addPage(); y=20; } 
+                doc.text(line, 22, y); 
+                y+=5; 
+            }); 
+            y+=8; 
+            if(y>270) doc.addPage(); 
+        } 
+        doc.save(`export_${new Date().toISOString().slice(0,10)}.pdf`); 
+        addAuditLog("EXPORT_PDF", "N/A", `PDF exported`); 
+    };
+
+    document.getElementById("exportJPEG").onclick = async () => { 
+        let selected=Array.from(selectedEquipIndices).map(i=>equipmentDB[i]); 
+        if(selected.length===0){ toastMsg("Select equipment"); return; } 
+        let container=document.createElement("div"); 
+        container.style.background="white"; 
+        container.style.padding="20px"; 
+        container.style.width="800px"; 
+        container.innerHTML=`<h2>Equipment Logs Snapshot</h2>${selected.map(eq=>`<h3>${eq.manuf} ${eq.model}</h3><p><strong>Hospital:</strong> ${eq.hosp} | <strong>Location:</strong> ${eq.loc} | <strong>Serial:</strong> ${eq.serial||'—'}</p><table border="1" cellpadding="5" style="border-collapse:collapse; width:100%"><tr><th>Date</th><th>ET/SET</th><th>Jobs</th><th>Remark</th></tr>${eq.logs.map(l=>`<tr><td>${l.date}</td><td>${l.et}</td><td>${l.jobs||''}</td><td>${l.remark||''}</td></tr>`).join('')}</table><br>`).join('')}`; 
+        document.body.appendChild(container); 
+        html2canvas(container).then(canvas=>{ 
+            let link=document.createElement("a"); 
+            link.download=`screenshot_${new Date().toISOString().slice(0,10)}.jpeg`; 
+            link.href=canvas.toDataURL(); 
+            link.click(); 
+            document.body.removeChild(container); 
+            addAuditLog("EXPORT_JPEG", "N/A", `JPEG screenshot captured`); 
+            toastMsg("JPEG captured"); 
+        }); 
+    };
+
+    document.getElementById("exportBtn").onclick = () => { 
+        const menu=document.getElementById("exportMenu"); 
+        menu.style.display=menu.style.display==="block"?"none":"block"; 
+        setTimeout(()=>{ 
+            document.addEventListener("click", function closeMenu(e){ 
+                if(!document.getElementById("exportBtn").contains(e.target)){ 
+                    menu.style.display="none"; 
+                    document.removeEventListener("click",closeMenu); 
+                } 
+            }); 
+        },10); 
+    };
+
+    // ==================== CLOUD SYNC BUTTON HANDLERS ====================
+    document.getElementById("syncBtn").onclick = async () => {
+        if (isSupabaseAvailable()) {
+            if (confirm("Sync all data to the cloud? This will overwrite cloud data with your local data.")) {
+                await syncToSupabase();
+                addAuditLog("SYNC_TO_CLOUD", "N/A", "Manual sync to cloud performed");
+            }
+        } else {
+            toastMsg("Supabase is not available. Please check your internet connection and Supabase configuration.");
+        }
+    };
+
+    document.getElementById("loadCloudBtn").onclick = async () => {
+        if (isSupabaseAvailable()) {
+            if (confirm("Load data from cloud? This will overwrite your local data with cloud data.")) {
+                const success = await loadFromSupabase();
+                if (success) {
+                    renderEquipmentGrid();
+                    populateFilterDropdowns();
+                    toastMsg("Loaded from cloud successfully");
+                    addAuditLog("LOAD_FROM_CLOUD", "N/A", "Manual load from cloud performed");
+                }
+            }
+        } else {
+            toastMsg("Supabase is not available. Please check your internet connection and Supabase configuration.");
+        }
+    };
+
+    // ==================== OTHER BUTTON HANDLERS ====================
+    document.getElementById("guideBtn").onclick = () => document.getElementById("guideModal").style.display="flex";
+    document.getElementById("saveAllBtn").onclick = () => saveToLocal();
+    
+    document.getElementById("refreshBtn").onclick = () => { 
+        loadFromLocal(); 
+        selectedEquipIndices.clear(); 
+        populateFilterDropdowns();
+    };
+    
+    document.getElementById("addEquipBtn").onclick = () => { 
+        document.getElementById("formMode").value="equipment"; 
+        document.getElementById("editEquipId").value="-1"; 
+        document.getElementById("formHosp").value=""; 
+        document.getElementById("formLoc").value=""; 
+        document.getElementById("formManuf").value=""; 
+        document.getElementById("formModel").value=""; 
+        document.getElementById("formSerial").value=""; 
+        document.getElementById("formEam").value=""; 
+        document.getElementById("formMaintenanceUnit").value="";
+        document.getElementById("formLogDate").value=""; 
+        document.getElementById("formLogEt").value=""; 
+        document.getElementById("formLogJobs").value=""; 
+        document.getElementById("formLogRemark").value=""; 
+        document.getElementById("formLogRef").value=""; 
+        document.getElementById("formLogStart").value=""; 
+        document.getElementById("formLogFinish").value=""; 
+        document.getElementById("formLogOther").value=""; 
+        document.getElementById("universalFormTitle").innerText="➕ Add New Equipment"; 
+        document.getElementById("universalFormModal").style.display="flex"; 
+    };
+
+    document.getElementById("addRecordFromModal").onclick = () => { 
+        if(window.currentEquipForLog!==undefined) openAddRecordForCurrent(window.currentEquipForLog); 
+        else toastMsg("No equipment"); 
+    };
+
+    document.getElementById("clearFilters").onclick = () => { 
+        document.querySelectorAll(".filters-panel select").forEach(i=>i.value=""); 
+        document.querySelectorAll(".filters-panel input").forEach(i=>i.value=""); 
+        renderEquipmentGrid(); 
+    };
+
+    // ==================== EVENT LISTENERS ====================
+    document.querySelectorAll("#filterHospital, #filterLocation, #filterManufacturer, #filterModel, #filterSerialEam, #filterMaintenanceUnit").forEach(el=>el.addEventListener("change",()=>renderEquipmentGrid()));
+    document.getElementById("searchAll").addEventListener("input",()=>renderEquipmentGrid());
+
+    // ==================== CLOCK FUNCTION ====================
+    function updateHKTime() { 
+        const now=new Date(); 
+        document.getElementById("hkDate").innerText=now.toLocaleDateString('en-HK',{timeZone:"Asia/Hong_Kong",year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}); 
+        document.getElementById("hkTime").innerText=now.toLocaleTimeString('en-HK',{hour12:false}); 
+    }
+    setInterval(updateHKTime,1000); 
+    updateHKTime();
+
+    // ==================== MODAL CLOSE FUNCTIONS ====================
+    const closeModals = () => { 
+        document.getElementById("logModal").style.display="none"; 
+        document.getElementById("universalFormModal").style.display="none"; 
+        document.getElementById("compareModal").style.display="none"; 
+        document.getElementById("guideModal").style.display="none"; 
+        document.getElementById("auditModal").style.display="none"; 
+    };
+    
+    document.getElementById("closeModalBtn").onclick=closeModals; 
+    document.getElementById("closeModalFooter").onclick=closeModals; 
+    document.getElementById("closeUniversalModal").onclick=closeModals; 
+    document.getElementById("cancelUniversalBtn").onclick=closeModals; 
+    document.getElementById("closeCompareBtn").onclick=closeModals; 
+    document.getElementById("closeGuideBtn").onclick=closeModals; 
+    document.getElementById("closeAuditBtn").onclick=closeModals; 
+    document.getElementById("closeAuditFooterBtn").onclick=closeModals;
+
+    // ==================== INITIALIZATION ====================
+    async function initializeApp() {
+        loadAuditLogs();
+        
+        // Try to load from cloud first if available
+        if (isSupabaseAvailable()) {
+            const cloudSuccess = await loadFromSupabase();
+            if (cloudSuccess) {
+                toastMsg('Database loaded from cloud');
+                return;
+            }
+        }
+        
+        // Fallback to local storage
+        const stored = localStorage.getItem("NTWC_MPU_DB");
+        if(stored) {
+            equipmentDB = JSON.parse(stored);
+            renderEquipmentGrid();
+            populateFilterDropdowns();
+            toastMsg('Loaded from local storage');
+            addAuditLog("PAGE_LOAD", "N/A", "Database loaded from local storage");
+        } else {
+            equipmentDB = JSON.parse(JSON.stringify(fullBackupData.equipment));
+            renderEquipmentGrid();
+            populateFilterDropdowns();
+            toastMsg('Loaded from default backup');
+            addAuditLog("PAGE_LOAD", "N/A", "Database initialized with default backup data");
+        }
+    }
+
+    // Start the application
+    initializeApp();
+</script>
+</body>
+</html>
